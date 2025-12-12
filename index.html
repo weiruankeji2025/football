@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超级HTML5足球联赛</title>
+    <style>
+        :root {
+            --primary-color: #2ecc71;
+            --secondary-color: #27ae60;
+            --ui-bg: rgba(0, 0, 0, 0.85);
+            --text-color: #fff;
+            --accent-color: #f1c40f;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: var(--text-color);
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            border: 5px solid #fff;
+            border-radius: 4px;
+        }
+
+        canvas {
+            display: block;
+            background-color: #3e8e41; /* 草地绿 */
+        }
+
+        /* UI 层 */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* 让点击穿透到下面，除非有按钮 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 顶部 HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            font-size: 24px;
+            font-weight: bold;
+            pointer-events: auto;
+        }
+
+        .score-board {
+            display: flex;
+            gap: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 20px;
+            border-radius: 20px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .team-blue { color: #3498db; text-shadow: 0 0 5px #3498db; }
+        .team-red { color: #e74c3c; text-shadow: 0 0 5px #e74c3c; }
+
+        /* 菜单屏幕 */
+        .screen {
+            background-color: var(--ui-bg);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            pointer-events: auto;
+            border: 2px solid var(--primary-color);
+            display: none; /* 默认隐藏 */
+            animation: fadeIn 0.3s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        h1 { margin: 0 0 20px 0; font-size: 40px; color: var(--primary-color); text-transform: uppercase; }
+        h2 { margin: 0 0 15px 0; color: var(--accent-color); }
+        p { color: #ccc; margin-bottom: 30px; line-height: 1.6; }
+
+        /* 按钮样式 */
+        .btn {
+            background-color: var(--primary-color);
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 0 4px 0 var(--secondary-color);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 var(--secondary-color);
+            filter: brightness(1.1);
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 0 0 var(--secondary-color);
+        }
+
+        .btn.secondary {
+            background-color: #e74c3c;
+            box-shadow: 0 4px 0 #c0392b;
+        }
+        .btn.secondary:hover { box-shadow: 0 6px 0 #c0392b; }
+
+        /* 提示信息 */
+        #message-overlay {
+            position: absolute;
+            top: 30%;
+            width: 100%;
+            text-align: center;
+            font-size: 60px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 4px 4px 0 #000;
+            pointer-events: none;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #message-overlay.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* 键盘提示 */
+        .controls-hint {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        .key {
+            display: inline-block;
+            background: #444;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border-bottom: 2px solid #222;
+            margin: 0 2px;
+            color: #fff;
+            font-family: monospace;
+        }
+
+        /* 右上角控制按钮 */
+        .hud-controls {
+            display: flex;
+            gap: 10px;
+        }
+        .icon-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .icon-btn:hover { background: rgba(255,255,255,0.4); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    
+    <!-- HUD -->
+    <div id="hud" class="ui-layer" style="display:none; justify-content: space-between; align-items: flex-start; height: auto; padding-top: 15px;">
+        <div class="score-board">
+            <span class="team-blue">蓝队: <span id="scoreBlue">0</span></span>
+            <span style="color:#aaa">|</span>
+            <span class="team-red">红队: <span id="scoreRed">0</span></span>
+        </div>
+        <div style="font-family: monospace; font-size: 30px; color: #fff; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 10px;">
+            <span id="timer">02:00</span>
+        </div>
+        <div class="hud-controls">
+            <button class="icon-btn" onclick="game.togglePause()" title="暂停/继续">⏸</button>
+            <button class="icon-btn" onclick="game.resetGame()" title="重置">↻</button>
+        </div>
+    </div>
+
+    <!-- 进球提示 -->
+    <div id="message-overlay">GOAL!!!</div>
+
+    <!-- 开始菜单 -->
+    <div id="start-screen" class="ui-layer">
+        <div class="screen active">
+            <h1>⚽ 超级足球联赛</h1>
+            <p>控制蓝队，击败红队！<br>使用战术配合和精准射门来赢得比赛。</p>
+            <div class="controls-hint">
+                <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移动
+                <span class="key">SPACE</span> 射门 / 冲刺
+            </div>
+            <br>
+            <button class="btn" onclick="game.start()">开始比赛</button>
+        </div>
+    </div>
+
+    <!-- 暂停菜单 -->
+    <div id="pause-screen" class="ui-layer" style="display: none;">
+        <div class="screen active">
+            <h1>已暂停</h1>
+            <button class="btn" onclick="game.togglePause()">继续游戏</button>
+            <button class="btn secondary" onclick="game.resetGame()">重新开始</button>
+        </div>
+    </div>
+
+    <!-- 游戏结束菜单 -->
+    <div id="gameover-screen" class="ui-layer" style="display: none;">
+        <div class="screen active">
+            <h1 id="winner-text">比赛结束</h1>
+            <h2 id="final-score">蓝 0 - 0 红</h2>
+            <button class="btn" onclick="game.resetGame()">再来一局</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 游戏逻辑核心
+ */
+class Vector {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    add(v) { return new Vector(this.x + v.x, this.y + v.y); }
+    sub(v) { return new Vector(this.x - v.x, this.y - v.y); }
+    mult(n) { return new Vector(this.x * n, this.y * n); }
+    mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+    normalize() {
+        let m = this.mag();
+        return m === 0 ? new Vector(0,0) : new Vector(this.x / m, this.y / m);
+    }
+    limit(max) {
+        if (this.mag() > max) return this.normalize().mult(max);
+        return this;
+    }
+    static dist(v1, v2) { return v1.sub(v2).mag(); }
+}
+
+class Entity {
+    constructor(x, y, radius, color) {
+        this.pos = new Vector(x, y);
+        this.vel = new Vector(0, 0);
+        this.radius = radius;
+        this.color = color;
+        this.mass = 1;
+        this.friction = 0.96; // 阻力
+    }
+
+    update() {
+        this.pos = this.pos.add(this.vel);
+        this.vel = this.vel.mult(this.friction);
+        
+        // 极小速度停止
+        if (this.vel.mag() < 0.1) this.vel = new Vector(0,0);
+    }
+
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.3)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.closePath();
+    }
+
+    checkBoundaries(width, height) {
+        if (this.pos.x < this.radius) { this.pos.x = this.radius; this.vel.x *= -0.5; }
+        if (this.pos.x > width - this.radius) { this.pos.x = width - this.radius; this.vel.x *= -0.5; }
+        if (this.pos.y < this.radius) { this.pos.y = this.radius; this.vel.y *= -0.5; }
+        if (this.pos.y > height - this.radius) { this.pos.y = height - this.radius; this.vel.y *= -0.5; }
+    }
+}
+
+class Ball extends Entity {
+    constructor(x, y) {
+        super(x, y, 10, "#fff"); // 足球样式
+        this.friction = 0.98; // 球滚得远一点
+    }
+
+    draw(ctx) {
+        // 绘制球体
+        super.draw(ctx);
+        // 绘制花纹（简单）
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, 4, 0, Math.PI*2);
+        ctx.fillStyle = "#000";
+        ctx.fill();
+    }
+}
+
+class Player extends Entity {
+    constructor(x, y, team, isHuman = false) {
+        super(x, y, 16, team === "blue" ? "#3498db" : "#e74c3c");
+        this.team = team;
+        this.isHuman = isHuman;
+        this.startPos = new Vector(x, y);
+        this.speed = isHuman ? 0.8 : 0.55; // 玩家稍微快一点
+        this.maxSpeed = isHuman ? 6 : 4.5;
+        this.kickPower = 8;
+        this.hasBall = false;
+        
+        // 号码
+        this.number = Math.floor(Math.random() * 11) + 1;
+    }
+
+    update(ball, keys) {
+        if (this.isHuman) {
+            // 键盘控制
+            let acc = new Vector(0, 0);
+            if (keys['w'] || keys['W']) acc.y -= 1;
+            if (keys['s'] || keys['S']) acc.y += 1;
+            if (keys['a'] || keys['A']) acc.x -= 1;
+            if (keys['d'] || keys['D']) acc.x += 1;
+
+            if (acc.mag() > 0) acc = acc.normalize().mult(this.speed);
+            this.vel = this.vel.add(acc);
+            
+            // 射门
+            if (keys[' '] && Vector.dist(this.pos, ball.pos) < this.radius + ball.radius + 5) {
+                this.kick(ball);
+            }
+        } else {
+            // AI 逻辑
+            this.aiBehavior(ball);
+        }
+
+        this.vel = this.vel.limit(this.maxSpeed);
+        super.update();
+    }
+
+    aiBehavior(ball) {
+        let distToBall = Vector.dist(this.pos, ball.pos);
+        let target = ball.pos;
+        
+        // 简单的AI：如果球离我很近，或者球在我的防守区域，我就追球
+        // 否则慢慢回到初始阵型位置
+        let defensiveRadius = 300;
+        
+        // 如果是进攻方（球在对方半场），或者防守方在危险区域
+        let shouldChase = distToBall < 200; 
+
+        if (shouldChase) {
+            let dir = target.sub(this.pos).normalize().mult(this.speed);
+            this.vel = this.vel.add(dir);
+
+            // 如果碰到了球，往对方球门踢
+            if (distToBall < this.radius + ball.radius + 5) {
+                // 简单的射门/传球逻辑
+                let goalX = this.team === "blue" ? 900 : 0; // 蓝攻右，红攻左
+                let goalTarget = new Vector(goalX, 300);
+                
+                // 加入一点随机性，不要每次都直直地射门
+                let noise = new Vector(Math.random()*40 - 20, Math.random()*40 - 20);
+                goalTarget = goalTarget.add(noise);
+
+                let kickDir = goalTarget.sub(this.pos).normalize().mult(this.kickPower * 0.8);
+                ball.vel = ball.vel.add(kickDir);
+            }
+        } else {
+            // 回位
+            let dir = this.startPos.sub(this.pos);
+            if (dir.mag() > 10) {
+                dir = dir.normalize().mult(this.speed * 0.5);
+                this.vel = this.vel.add(dir);
+            } else {
+                this.vel = this.vel.mult(0.9); // 停下来
+            }
+        }
+    }
+
+    kick(ball) {
+        // 玩家射门：朝当前移动方向或鼠标方向（这里简化为球和人的连线延伸）
+        let dir = ball.pos.sub(this.pos).normalize();
+        
+        // 如果玩家静止，默认朝向对方球门
+        if (this.vel.mag() < 0.1) {
+            dir = new Vector(this.team === "blue" ? 1 : -1, 0);
+        } else {
+             // 混合一点玩家的运动惯性
+            dir = dir.add(this.vel.normalize().mult(0.5)).normalize();
+        }
+
+        ball.vel = ball.vel.add(dir.mult(this.kickPower));
+    }
+
+    draw(ctx) {
+        super.draw(ctx);
+        // 绘制号码
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(this.number, this.pos.x, this.pos.y);
+    }
+}
+
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.width = this.canvas.width;
+        this.height = this.canvas.height;
+        
+        this.keys = {};
+        this.setupInputs();
+
+        this.state = "MENU"; // MENU, PLAYING, PAUSED, GOAL, GAMEOVER
+        this.score = { blue: 0, red: 0 };
+        this.timeRemaining = 120; // 2分钟
+        this.lastTime = 0;
+        
+        // 实体
+        this.ball = new Ball(this.width/2, this.height/2);
+        this.players = [];
+
+        this.animationId = null;
+        this.goalMessageTimer = null;
+    }
+
+    initTeams() {
+        this.players = [];
+        
+        // 蓝队 (左侧，玩家控制一个)
+        // 阵型：1-2-1
+        this.players.push(new Player(100, 300, "blue", false)); // 门将/后卫
+        this.players.push(new Player(300, 200, "blue", true));  // 玩家 (中场)
+        this.players.push(new Player(300, 400, "blue", false)); // 队友
+        this.players.push(new Player(450, 300, "blue", false)); // 前锋
+
+        // 红队 (右侧，全AI)
+        this.players.push(new Player(800, 300, "red", false)); 
+        this.players.push(new Player(600, 200, "red", false)); 
+        this.players.push(new Player(600, 400, "red", false));
+        this.players.push(new Player(450, 300, "red", false)); // 开球前锋，稍微错开
+        
+        // 调整红队最后一个人的位置，避免和蓝队重叠
+        this.players[7].pos.x += 10;
+    }
+
+    setupInputs() {
+        window.addEventListener('keydown', e => this.keys[e.key] = true);
+        window.addEventListener('keyup', e => this.keys[e.key] = false);
+    }
+
+    start() {
+        this.score = { blue: 0, red: 0 };
+        this.timeRemaining = 120;
+        this.updateScoreBoard();
+        this.resetPositions();
+        
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('gameover-screen').style.display = 'none';
+        document.getElementById('hud').style.display = 'flex';
+        
+        this.state = "PLAYING";
+        this.loop();
+        this.startTimer();
+    }
+
+    startTimer() {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => {
+            if (this.state === "PLAYING") {
+                this.timeRemaining--;
+                this.updateTimerDisplay();
+                if (this.timeRemaining <= 0) {
+                    this.endGame();
+                }
+            }
+        }, 1000);
+    }
+
+    updateTimerDisplay() {
+        let min = Math.floor(this.timeRemaining / 60);
+        let sec = this.timeRemaining % 60;
+        document.getElementById('timer').innerText = 
+            `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    }
+
+    togglePause() {
+        if (this.state === "PLAYING") {
+            this.state = "PAUSED";
+            document.getElementById('pause-screen').style.display = 'flex';
+            cancelAnimationFrame(this.animationId);
+        } else if (this.state === "PAUSED") {
+            this.state = "PLAYING";
+            document.getElementById('pause-screen').style.display = 'none';
+            this.loop();
+        }
+    }
+
+    resetGame() {
+        document.getElementById('pause-screen').style.display = 'none';
+        document.getElementById('gameover-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'flex';
+        document.getElementById('hud').style.display = 'none';
+        
+        cancelAnimationFrame(this.animationId);
+        clearInterval(this.timerInterval);
+        this.state = "MENU";
+    }
+
+    endGame() {
+        this.state = "GAMEOVER";
+        clearInterval(this.timerInterval);
+        
+        let winnerText = "平局!";
+        if (this.score.blue > this.score.red) winnerText = "蓝队获胜! 🏆";
+        if (this.score.red > this.score.blue) winnerText = "红队获胜! 😢";
+
+        document.getElementById('winner-text').innerText = winnerText;
+        document.getElementById('final-score').innerText = `蓝 ${this.score.blue} - ${this.score.red} 红`;
+        
+        document.getElementById('gameover-screen').style.display = 'flex';
+    }
+
+    resetPositions() {
+        this.initTeams();
+        this.ball.pos = new Vector(this.width/2, this.height/2);
+        this.ball.vel = new Vector(0,0);
+    }
+
+    showGoalMessage(text) {
+        let el = document.getElementById('message-overlay');
+        el.innerText = text;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2000);
+    }
+
+    update() {
+        if (this.state !== "PLAYING" && this.state !== "GOAL") return;
+
+        // 更新球
+        this.ball.update();
+        
+        // 检查进球
+        if (this.state === "PLAYING") {
+            // 简单的球门判定：X超过边界且Y在一定范围内
+            const goalTop = this.height/2 - 75; // 球门宽150
+            const goalBottom = this.height/2 + 75;
+
+            if (this.ball.pos.y > goalTop && this.ball.pos.y < goalBottom) {
+                if (this.ball.pos.x < 5) {
+                    // 红队进球
+                    this.handleGoal("red");
+                } else if (this.ball.pos.x > this.width - 5) {
+                    // 蓝队进球
+                    this.handleGoal("blue");
+                }
+            }
+        }
+
+        // 球的边界反弹 (非球门区域)
+        const goalTop = this.height/2 - 75;
+        const goalBottom = this.height/2 + 75;
+        
+        // X轴墙壁
+        if (this.ball.pos.x < this.ball.radius) {
+            if(this.ball.pos.y <= goalTop || this.ball.pos.y >= goalBottom) {
+                 this.ball.pos.x = this.ball.radius; this.ball.vel.x *= -0.7;
+            }
+        }
+        if (this.ball.pos.x > this.width - this.ball.radius) {
+             if(this.ball.pos.y <= goalTop || this.ball.pos.y >= goalBottom) {
+                 this.ball.pos.x = this.width - this.ball.radius; this.ball.vel.x *= -0.7;
+            }
+        }
+        // Y轴墙壁
+        if (this.ball.pos.y < this.ball.radius) { this.ball.pos.y = this.ball.radius; this.ball.vel.y *= -0.7; }
+        if (this.ball.pos.y > this.height - this.ball.radius) { this.ball.pos.y = this.height - this.ball.radius; this.ball.vel.y *= -0.7; }
+
+
+        // 更新球员 & 碰撞检测
+        this.players.forEach(p => {
+            p.update(this.ball, this.keys);
+            p.checkBoundaries(this.width, this.height);
+
+            // 球员撞球
+            let dist = Vector.dist(p.pos, this.ball.pos);
+            if (dist < p.radius + this.ball.radius) {
+                // 简单的弹性碰撞逻辑
+                let normal = this.ball.pos.sub(p.pos).normalize();
+                
+                // 稍微推开，防止粘连
+                let overlap = (p.radius + this.ball.radius) - dist;
+                this.ball.pos = this.ball.pos.add(normal.mult(overlap));
+
+                // 力的传递
+                let force = p.vel.mag() * 1.5; 
+                if (force < 2) force = 2; // 即使静止也能踢动一点点
+                
+                this.ball.vel = this.ball.vel.add(normal.mult(force * 0.5));
+                
+                // 削减球员速度
+                p.vel = p.vel.mult(0.7);
+            }
+        });
+    }
+
+    handleGoal(team) {
+        this.state = "GOAL";
+        if (team === "blue") {
+            this.score.blue++;
+            this.showGoalMessage("蓝队进球! GOAL!");
+        } else {
+            this.score.red++;
+            this.showGoalMessage("红队进球! GOAL!");
+        }
+        this.updateScoreBoard();
+
+        // 2秒后重置
+        setTimeout(() => {
+            if (this.state === "GAMEOVER" || this.state === "MENU") return;
+            this.resetPositions();
+            this.state = "PLAYING";
+        }, 2000);
+    }
+
+    updateScoreBoard() {
+        document.getElementById('scoreBlue').innerText = this.score.blue;
+        document.getElementById('scoreRed').innerText = this.score.red;
+    }
+
+    drawField() {
+        let ctx = this.ctx;
+        ctx.fillStyle = "#3e8e41";
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        // 绘制草坪条纹
+        ctx.fillStyle = "rgba(0,0,0,0.05)";
+        for (let i = 0; i < this.width; i+=100) {
+            ctx.fillRect(i, 0, 50, this.height);
+        }
+
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+
+        // 边框
+        ctx.strokeRect(5, 5, this.width - 10, this.height - 10);
+
+        // 中线
+        ctx.beginPath();
+        ctx.moveTo(this.width / 2, 5);
+        ctx.lineTo(this.width / 2, this.height - 5);
+        ctx.stroke();
+
+        // 中圈
+        ctx.beginPath();
+        ctx.arc(this.width / 2, this.height / 2, 70, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(this.width / 2, this.height / 2, 2, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+
+        // 左球门禁区
+        ctx.strokeRect(5, this.height/2 - 120, 120, 240); // 大禁区
+        ctx.strokeRect(5, this.height/2 - 60, 40, 120);   // 小禁区
+        
+        // 右球门禁区
+        ctx.strokeRect(this.width - 125, this.height/2 - 120, 120, 240);
+        ctx.strokeRect(this.width - 45, this.height/2 - 60, 40, 120);
+
+        // 绘制真实的球门网（视觉效果）
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        // 左网
+        ctx.strokeRect(-20, this.height/2 - 75, 20, 150);
+        // 右网
+        ctx.strokeRect(this.width, this.height/2 - 75, 20, 150);
+        
+        // 角球弧
+        ctx.beginPath(); ctx.arc(5, 5, 20, 0, Math.PI*0.5); ctx.stroke();
+        ctx.beginPath(); ctx.arc(5, this.height-5, 20, Math.PI*1.5, 0); ctx.stroke();
+        ctx.beginPath(); ctx.arc(this.width-5, 5, 20, Math.PI*0.5, Math.PI); ctx.stroke();
+        ctx.beginPath(); ctx.arc(this.width-5, this.height-5, 20, Math.PI, Math.PI*1.5); ctx.stroke();
+    }
+
+    loop() {
+        this.update();
+        
+        this.drawField();
+        this.players.forEach(p => p.draw(this.ctx));
+        this.ball.draw(this.ctx);
+
+        if (this.state === "PLAYING" || this.state === "GOAL") {
+            this.animationId = requestAnimationFrame(() => this.loop());
+        }
+    }
+}
+
+// 初始化游戏
+const game = new Game();
+
+</script>
+</body>
+</html>
